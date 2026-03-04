@@ -164,3 +164,57 @@ apiRouter.post("/tenant/members/role", requireTenantAdmin, async (req, res) => {
   res.status(204).end();
 });
 
+apiRouter.get("/training/sessions", requireAuth, async (req, res) => {
+  const tenantId = req.session.activeTenantId;
+  if (!tenantId) {
+    res.status(400).json({ error: "no_active_tenant" });
+    return;
+  }
+
+  const sessions = await prisma.trainingSession.findMany({
+    where: { tenantId },
+    include: {
+      course: true,
+      attendees: true,
+    },
+    orderBy: { date: "asc" },
+  });
+
+  res.json(
+    sessions.map((s) => ({
+      id: s.id,
+      courseName: s.course.name,
+      date: s.date,
+      attendees: s.attendees.length,
+      attended: s.attendees.filter((a) => a.attended).length,
+    })),
+  );
+});
+
+apiRouter.get("/training/bookings", requireAuth, async (req, res) => {
+  const tenantId = req.session.activeTenantId;
+  if (!tenantId) {
+    res.status(400).json({ error: "no_active_tenant" });
+    return;
+  }
+
+  const bookings = await prisma.booking.findMany({
+    where: { tenantId },
+    include: {
+      organizer: { select: { email: true, name: true } },
+    },
+    orderBy: { startsAt: "asc" },
+  });
+
+  res.json(
+    bookings.map((b) => ({
+      id: b.id,
+      title: b.title,
+      startsAt: b.startsAt,
+      endsAt: b.endsAt,
+      organizer: b.organizer?.email ?? null,
+      outlookEventId: b.outlookEventId,
+    })),
+  );
+});
+

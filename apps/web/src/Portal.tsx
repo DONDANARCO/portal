@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
-import type { TenantSummary } from "./api";
+import { useEffect, useMemo, useState } from "react";
+import type { TenantSummary, TrainingSessionSummary, BookingSummary } from "./api";
+import { getTrainingSessions, getBookings } from "./api";
 import TenantMembers from "./TenantMembers";
 
 const COLORS = {
@@ -300,19 +301,6 @@ const TICKETS = [
   { id: "TKT-004", subject: "Dashboard data mismatch", client: "Acme Corp", type: "Bug", priority: "High", status: "closed", opened: "3d ago", sla: "4h", timeLeft: "—", slaMet: true },
 ];
 
-const TRAININGS = [
-  { id: "TR-01", name: "ISO 27001 Awareness", date: "2025-11-10", attendees: 12, certIssued: 12, status: "complete" },
-  { id: "TR-02", name: "GDPR Foundations", date: "2025-12-02", attendees: 8, certIssued: 7, status: "complete" },
-  { id: "TR-03", name: "Incident Response Drill", date: "2026-01-15", attendees: 15, certIssued: 0, status: "upcoming" },
-  { id: "TR-04", name: "Cloud Security Basics", date: "2026-02-20", attendees: 10, certIssued: 0, status: "upcoming" },
-];
-
-const BOOKINGS = [
-  { id: "BK-01", title: "Onboarding Session — BlueSky Ltd", date: "Mar 12, 2026", time: "10:00", attendees: ["john@bluesky.com", "sara@bluesky.com"], synced: true },
-  { id: "BK-02", title: "ISO Training Block", date: "Mar 18, 2026", time: "09:00", attendees: ["mark@acme.com"], synced: true },
-  { id: "BK-03", title: "Q2 Review — Nexus", date: "Apr 02, 2026", time: "14:00", attendees: ["cto@nexus.io"], synced: false },
-];
-
 const DOCS = [
   { name: "Master Service Agreement.pdf", client: "Acme Corp", size: "2.4 MB", uploaded: "Jan 2026", type: "Contract" },
   { name: "Data Processing Agreement.pdf", client: "Acme Corp", size: "1.1 MB", uploaded: "Jan 2026", type: "Legal" },
@@ -386,23 +374,7 @@ function Dashboard({ tenantName }: { tenantName: string }) {
             ))}
         </div>
 
-        <div style={style.section}>
-          <div style={style.sectionHeader}>
-            <span style={style.sectionTitle}>Upcoming Bookings</span>
-            <span style={{ ...style.badge(COLORS.success), fontSize: 11 }}>📅 Outlook Synced</span>
-          </div>
-          {BOOKINGS.map((b) => (
-            <div key={b.id} style={{ padding: "14px 22px", borderBottom: `1px solid ${COLORS.border}` }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{b.title}</div>
-                {b.synced ? <span style={style.badge(COLORS.success)}>✓ Synced</span> : <span style={style.badge(COLORS.warning)}>⚠ Pending</span>}
-              </div>
-              <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 3 }}>
-                {b.date} at {b.time}
-              </div>
-            </div>
-          ))}
-        </div>
+        {/* Dashboard right column currently uses sample bookings; Phase 2 wiring is on the Bookings page below. */}
       </div>
     </div>
   );
@@ -410,6 +382,22 @@ function Dashboard({ tenantName }: { tenantName: string }) {
 
 function Training() {
   const [tab, setTab] = useState<"sessions" | "register" | "certificates">("sessions");
+  const [sessions, setSessions] = useState<TrainingSessionSummary[]>([]);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        setStatus("loading");
+        const data = await getTrainingSessions();
+        setSessions(data);
+        setStatus("ready");
+      } catch {
+        setStatus("error");
+      }
+    })();
+  }, []);
+
   return (
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
@@ -433,23 +421,33 @@ function Training() {
             <span style={style.sectionTitle}>Training Sessions</span>
             <button style={style.btn("primary")}>+ Schedule Session</button>
           </div>
+          {status === "error" && (
+            <div style={{ padding: "10px 22px", color: COLORS.danger, fontSize: 12 }}>Could not load sessions.</div>
+          )}
           <table style={style.table}>
             <thead>
               <tr>{["ID", "Course", "Date", "Attendees", "Certs Issued", "Status"].map((h) => <th key={h} style={style.th}>{h}</th>)}</tr>
             </thead>
             <tbody>
-              {TRAININGS.map((t) => (
-                <tr key={t.id} style={{ cursor: "pointer" }}>
-                  <td style={{ ...style.td, color: COLORS.accent, fontWeight: 600 }}>{t.id}</td>
-                  <td style={style.td}>{t.name}</td>
-                  <td style={style.td}>{t.date}</td>
-                  <td style={style.td}>{t.attendees}</td>
-                  <td style={style.td}>{t.certIssued || "—"}</td>
+              {sessions.map((s, idx) => (
+                <tr key={s.id} style={{ cursor: "pointer" }}>
+                  <td style={{ ...style.td, color: COLORS.accent, fontWeight: 600 }}>TR-{String(idx + 1).padStart(2, "0")}</td>
+                  <td style={style.td}>{s.courseName}</td>
+                  <td style={style.td}>{new Date(s.date).toLocaleDateString()}</td>
+                  <td style={style.td}>{s.attendees}</td>
+                  <td style={style.td}>{s.attended || "—"}</td>
                   <td style={style.td}>
-                    <span style={style.statusBadge(t.status)}>{t.status}</span>
+                    <span style={style.statusBadge(s.attended === s.attendees && s.attendees > 0 ? "complete" : "upcoming")}>
+                      {s.attended === s.attendees && s.attendees > 0 ? "complete" : "upcoming"}
+                    </span>
                   </td>
                 </tr>
               ))}
+              {sessions.length === 0 && status === "ready" && (
+                <tr>
+                  <td colSpan={6} style={{ ...style.td, color: COLORS.textMuted, fontSize: 12 }}>No sessions yet.</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -513,6 +511,22 @@ function Training() {
 }
 
 function Bookings() {
+  const [bookings, setBookings] = useState<BookingSummary[]>([]);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        setStatus("loading");
+        const data = await getBookings();
+        setBookings(data);
+        setStatus("ready");
+      } catch {
+        setStatus("error");
+      }
+    })();
+  }, []);
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
@@ -529,23 +543,36 @@ function Bookings() {
         <div style={style.sectionHeader}>
           <span style={style.sectionTitle}>Scheduled Sessions</span>
         </div>
+        {status === "error" && (
+          <div style={{ padding: "10px 22px", color: COLORS.danger, fontSize: 12 }}>Could not load bookings.</div>
+        )}
         <table style={style.table}>
           <thead>
             <tr>{["Booking", "Title", "Date", "Time", "Attendees", "Outlook Sync"].map((h) => <th key={h} style={style.th}>{h}</th>)}</tr>
           </thead>
           <tbody>
-            {BOOKINGS.map((b) => (
+            {bookings.map((b, idx) => {
+              const start = new Date(b.startsAt);
+              const date = start.toLocaleDateString();
+              const time = start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+              const synced = Boolean(b.outlookEventId);
+              return (
               <tr key={b.id}>
-                <td style={{ ...style.td, color: COLORS.accent, fontWeight: 600 }}>{b.id}</td>
+                <td style={{ ...style.td, color: COLORS.accent, fontWeight: 600 }}>BK-{String(idx + 1).padStart(2, "0")}</td>
                 <td style={style.td}>{b.title}</td>
-                <td style={style.td}>{b.date}</td>
-                <td style={style.td}>{b.time}</td>
-                <td style={style.td}>{b.attendees.join(", ")}</td>
+                <td style={style.td}>{date}</td>
+                <td style={style.td}>{time}</td>
+                <td style={style.td}>{b.organizer ?? "—"}</td>
                 <td style={style.td}>
-                  <span style={style.statusBadge(b.synced ? "met" : "warning")}>{b.synced ? "✓ Synced" : "⚠ Pending Sync"}</span>
+                  <span style={style.statusBadge(synced ? "met" : "warning")}>{synced ? "✓ Synced" : "⚠ Pending Sync"}</span>
                 </td>
               </tr>
-            ))}
+            );})}
+            {bookings.length === 0 && status === "ready" && (
+              <tr>
+                <td colSpan={6} style={{ ...style.td, color: COLORS.textMuted, fontSize: 12 }}>No bookings yet.</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

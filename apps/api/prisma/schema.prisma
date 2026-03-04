@@ -17,6 +17,10 @@ model Tenant {
 
   memberships TenantMembership[]
   domains     TenantDomain[]
+  trainingCourses TrainingCourse[]
+  trainingSessions TrainingSession[]
+  trainingCertificates TrainingCertificate[]
+  bookings   Booking[]
 }
 
 model User {
@@ -29,6 +33,8 @@ model User {
   updatedAt     DateTime @updatedAt
 
   memberships TenantMembership[]
+
+  organizedBookings Booking[]
 
   @@unique([authProvider, authSubject])
 }
@@ -58,4 +64,83 @@ model TenantDomain {
 
   @@unique([tenantId, domain])
   @@index([domain])
+}
+
+model TrainingCourse {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sessions TrainingSession[]
+
+  @@index([tenantId])
+}
+
+model TrainingSession {
+  id          String   @id @default(cuid())
+  tenantId    String
+  courseId    String
+  date        DateTime
+  attendeesPlanned Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  course    TrainingCourse   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  attendees TrainingAttendee[]
+
+  @@index([tenantId])
+  @@index([courseId])
+}
+
+model TrainingAttendee {
+  id         String   @id @default(cuid())
+  sessionId  String
+  email      String
+  name       String?
+  attended   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  session TrainingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  certificates TrainingCertificate[]
+
+  @@index([sessionId])
+}
+
+model TrainingCertificate {
+  id          String   @id @default(cuid())
+  tenantId    String
+  attendeeId  String
+  title       String
+  issuedAt    DateTime
+  expiresAt   DateTime?
+  pdfKey      String?
+  createdAt   DateTime @default(now())
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  attendee TrainingAttendee @relation(fields: [attendeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([attendeeId])
+}
+
+model Booking {
+  id          String   @id @default(cuid())
+  tenantId    String
+  title       String
+  startsAt    DateTime
+  endsAt      DateTime
+  organizerId String?
+  outlookEventId String?
+  createdAt   DateTime @default(now())
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  organizer User?  @relation(fields: [organizerId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([organizerId])
 }

@@ -73,3 +73,32 @@ export async function setTenantMemberRole(input: { email: string; role: "client_
   if (!res.ok) throw new Error("failed");
 }
 
+export type TrainingSessionSummary = {
+  id: string;
+  courseName: string;
+  date: string;
+  attendees: number;
+  attended: number;
+};
+
+export async function getTrainingSessions(): Promise<TrainingSessionSummary[]> {
+  const res = await fetch("/api/training/sessions", { credentials: "include" });
+  if (!res.ok) throw new Error("failed");
+  return res.json();
+}
+
+export type BookingSummary = {
+  id: string;
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  organizer: string | null;
+  outlookEventId: string | null;
+};
+
+export async function getBookings(): Promise<BookingSummary[]> {
+  const res = await fetch("/api/training/bookings", { credentials: "include" });
+  if (!res.ok) throw new Error("failed");
+  return res.json();
+}
+
